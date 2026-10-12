@@ -4,264 +4,218 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 가위바위보 손 모양 인식기</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Google Fonts: 둥근 모서리 느낌의 폰트 -->
+    <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap');
-        body { font-family: 'Pretendard', sans-serif; }
+        body {
+            font-family: 'Jua', sans-serif;
+        }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+<body class="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 min-h-screen flex flex-col items-center justify-between p-4">
 
-    <header class="w-full bg-slate-900/80 backdrop-blur-md border-b border-slate-800 py-4 px-6 sticky top-0 z-50">
-        <div class="max-w-5xl mx-auto flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-500/30">
-                    <i class="fa-solid fa-hand-fist text-white text-lg"></i>
-                </div>
-                <div>
-                    <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
-                        Roboflow AI Gesture
-                    </h1>
-                    <p class="text-xs text-slate-400">실시간 가위바위보 손 모양 인식기</p>
-                </div>
-            </div>
-            <div class="flex items-center space-x-2">
-                <span id="api-status" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                    <span class="w-2 h-2 mr-1.5 rounded-full bg-amber-400 animate-pulse"></span>대기 중
-                </span>
-            </div>
-        </div>
+    <!-- 상단 타이틀 -->
+    <header class="w-full max-w-md text-center py-4">
+        <h1 class="text-3xl text-indigo-700 drop-shadow-sm">✨ AI 가위바위보 인식기 ✨</h1>
+        <p class="text-sm text-gray-500 mt-1">웹캠에 가위, 바위, 보를 보여주세요!</p>
     </header>
 
-    <main class="flex-1 max-w-5xl w-full mx-auto p-4 md:p-6 flex flex-col lg:flex-row gap-6 items-center justify-center">
-        
-        <!-- Camera feed & Canvas section -->
-        <div class="relative w-full lg:w-7/12 aspect-[4/3] bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl flex items-center justify-center group">
+    <!-- 중앙 웹캠 및 결과 표시 영역 -->
+    <main class="w-full max-w-md flex flex-col items-center relative flex-1 justify-center my-2">
+        <div class="relative w-full aspect-[3/4] bg-white rounded-3xl shadow-xl overflow-hidden border-4 border-indigo-100 flex items-center justify-center">
+            <!-- 웹캠 비디오 -->
             <video id="webcam" autoplay playsinline muted class="w-full h-full object-cover transform -scale-x-100"></video>
-            <canvas id="snapshot-canvas" class="hidden"></canvas>
+            <!-- 캡처용 숨겨진 캔버스 -->
+            <canvas id="canvas" class="hidden"></canvas>
 
-            <!-- Top-right Gesture & Confidence Display -->
-            <div class="absolute top-4 right-4 bg-slate-950/80 backdrop-blur-md border border-slate-700/60 rounded-xl p-4 shadow-xl flex flex-col items-center min-w-[120px] transition-all duration-300">
-                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">인식 결과</span>
-                <div id="gesture-icon" class="text-4xl my-1">🤔</div>
-                <div id="gesture-name" class="text-base font-bold text-slate-200 capitalize">-</div>
-                <div id="gesture-conf" class="text-xs font-medium text-indigo-400 mt-0.5">신뢰도: 0%</div>
+            <!-- 오른쪽 상단 인식 결과 오버레이 -->
+            <div id="result-badge" class="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-4 py-3 rounded-2xl shadow-lg border border-indigo-50 flex flex-col items-center transition-all duration-300">
+                <span id="result-icon" class="text-4xl">⏳</span>
+                <span id="result-text" class="text-xs text-gray-500 mt-1">대기 중</span>
+                <span id="result-conf" class="text-xs font-bold text-indigo-600">0%</span>
             </div>
 
-            <!-- Bottom status overlay -->
-            <div class="absolute bottom-4 left-4 right-4 bg-slate-950/70 backdrop-blur-md border border-slate-800 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs">
-                <div class="flex items-center space-x-2">
-                    <i class="fa-solid fa-video text-indigo-400"></i>
-                    <span id="cam-status" class="text-slate-300">카메라 연결 중...</span>
-                </div>
-                <div id="fps-counter" class="text-slate-400 font-mono">1초 주기 전송</div>
-            </div>
-        </div>
-
-        <!-- Control panel & Stats section -->
-        <div class="w-full lg:w-5/12 flex flex-col space-y-4">
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
-                <h2 class="text-lg font-bold text-slate-100 flex items-center space-x-2">
-                    <i class="fa-solid fa-sliders text-indigo-400"></i>
-                    <span>컨트롤 패널</span>
-                </h2>
-
-                <div class="grid grid-cols-3 gap-3 text-center">
-                    <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                        <div class="text-2xl mb-1">✊</div>
-                        <div class="text-xs font-semibold text-slate-300">바위</div>
-                        <div id="count-rock" class="text-lg font-extrabold text-indigo-400 mt-1">0</div>
-                    </div>
-                    <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                        <div class="text-2xl mb-1">🖐</div>
-                        <div class="text-xs font-semibold text-slate-300">보</div>
-                        <div id="count-paper" class="text-lg font-extrabold text-indigo-400 mt-1">0</div>
-                    </div>
-                    <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                        <div class="text-2xl mb-1">✌</div>
-                        <div class="text-xs font-semibold text-slate-300">가위</div>
-                        <div id="count-scissors" class="text-lg font-extrabold text-indigo-400 mt-1">0</div>
-                    </div>
-                </div>
-
-                <div class="space-y-2 pt-2">
-                    <button id="toggle-btn" onclick="toggleRecognition()" class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center space-x-2">
-                        <i class="fa-solid fa-play"></i>
-                        <span id="toggle-text">인식 시작하기</span>
-                    </button>
-                    <button onclick="resetStats()" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl transition-all text-sm">
-                        통계 초기화
-                    </button>
-                </div>
-            </div>
-
-            <!-- Guide Card -->
-            <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 text-xs text-slate-400 space-y-2">
-                <div class="font-bold text-slate-300 flex items-center space-x-1.5">
-                    <i class="fa-solid fa-circle-info text-cyan-400"></i>
-                    <span>안내사항</span>
-                </div>
-                <p>• 카메라 권한을 허용해야 원활하게 동작합니다.</p>
-                <p>• 약 1초 간격으로 서버리스 API(<code class="text-indigo-300">/api/generate</code>)를 통해 Roboflow 모델로 이미지를 전송합니다.</p>
-                <p>• <code class="text-indigo-300">rock</code>, <code class="text-indigo-300">paper</code>, <code class="text-indigo-300">scissors</code> 클래스를 올바르게 인식합니다.</p>
+            <!-- 카메라 꺼짐 상태 안내 -->
+            <div id="camera-off-msg" class="absolute inset-0 flex flex-col items-center justify-center bg-indigo-50/80 text-indigo-400">
+                <svg class="w-16 h-16 mb-2 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+                <span class="text-lg">카메라를 시작해주세요</span>
             </div>
         </div>
-
     </main>
 
-    <footer class="w-full text-center py-4 border-t border-slate-900 text-xs text-slate-500">
-        AI Hand Gesture Recognizer powered by Roboflow & Vercel Serverless Functions
+    <!-- 하단 컨트롤 버튼 영역 -->
+    <footer class="w-full max-w-md py-4 flex flex-col gap-3">
+        <div class="grid grid-cols-2 gap-3">
+            <button id="cam-toggle-btn" onclick="toggleCamera()" class="py-3 px-4 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded-2xl shadow-md transition active:scale-95 flex items-center justify-center gap-2">
+                📷 카메라 켜기
+            </button>
+            <button id="detect-toggle-btn" onclick="toggleDetection()" disabled class="py-3 px-4 bg-gray-200 text-gray-400 font-medium rounded-2xl shadow-sm transition active:scale-95 flex items-center justify-center gap-2 cursor-not-allowed">
+                ▶️ 인식 시작
+            </button>
+        </div>
     </footer>
 
+    <!-- 자바스크립트 로직 -->
     <script>
         const video = document.getElementById('webcam');
-        const canvas = document.getElementById('snapshot-canvas');
-        const ctx = canvas.getContext('2d');
+        const canvas = document.getElementById('canvas');
+        const cameraOffMsg = document.getElementById('camera-off-msg');
+        const camToggleBtn = document.getElementById('cam-toggle-btn');
+        const detectToggleBtn = document.getElementById('detect-toggle-btn');
+        
+        const resultIcon = document.getElementById('result-icon');
+        const resultText = document.getElementById('result-text');
+        const resultConf = document.getElementById('result-conf');
 
-        const gestureIcon = document.getElementById('gesture-icon');
-        const gestureName = document.getElementById('gesture-name');
-        const gestureConf = document.getElementById('gesture-conf');
-        const camStatus = document.getElementById('cam-status');
-        const apiStatus = document.getElementById('api-status');
-        const toggleBtn = document.getElementById('toggle-btn');
-        const toggleText = document.getElementById('toggle-text');
+        let mediaStream = null;
+        let isCameraOn = false;
+        let isDetecting = false;
+        let detectInterval = null;
+        let isProcessing = false; // 중복 API 요청 방지용 플래그
 
-        let isRunning = false;
-        let intervalId = null;
-        let isProcessing = false; // Prevent concurrent requests (throttling)
-
-        const counts = { rock: 0, paper: 0, scissors: 0 };
-
-        const gestureMap = {
-            'rock': { name: '바위', icon: '✊' },
-            'paper': { name: '보', icon: '🖐' },
-            'scissors': { name: '가위', icon: '✌' }
+        // 이모지 및 한글 매핑
+        const classMap = {
+            'rock': { text: '바위', icon: '✊' },
+            'paper': { text: '보', icon: '🖐' },
+            'scissors': { text: '가위', icon: '✌' }
         };
 
-        // Initialize Web Camera
-        async function initCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
-                video.srcObject = stream;
-                camStatus.textContent = '카메라 연결됨';
-                apiStatus.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
-                apiStatus.innerHTML = '<span class="w-2 h-2 mr-1.5 rounded-full bg-emerald-400"></span>준비됨';
-            } catch (err) {
-                console.error("Camera error:", err);
-                camStatus.textContent = '카메라 접근 실패';
-                apiStatus.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20';
-                apiStatus.innerHTML = '<span class="w-2 h-2 mr-1.5 rounded-full bg-rose-400"></span>오류 발생';
-            }
-        }
-
-        function toggleRecognition() {
-            if (!isRunning) {
-                startRecognition();
+        // 카메라 켜기 /끄기 토글
+        async function toggleCamera() {
+            if (!isCameraOn) {
+                try {
+                    mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } 
+                    });
+                    video.srcObject = mediaStream;
+                    isCameraOn = true;
+                    cameraOffMsg.classList.add('hidden');
+                    camToggleBtn.innerHTML = '🛑 카메라 끄기';
+                    camToggleBtn.className = 'py-3 px-4 bg-rose-500 hover:bg-rose-600 text-white font-medium rounded-2xl shadow-md transition active:scale-95 flex items-center justify-center gap-2';
+                    
+                    // 인식 버튼 활성화
+                    detectToggleBtn.disabled = false;
+                    detectToggleBtn.className = 'py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-2xl shadow-md transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer';
+                } catch (err) {
+                    alert('웹캠 권한이 거부되었거나 카메라를 사용할 수 없습니다.');
+                    console.error(err);
+                }
             } else {
-                stopRecognition();
+                stopDetection();
+                if (mediaStream) {
+                    mediaStream.getTracks().forEach(track => track.stop());
+                }
+                video.srcObject = null;
+                isCameraOn = false;
+                cameraOffMsg.classList.remove('hidden');
+                camToggleBtn.innerHTML = '📷 카메라 켜기';
+                camToggleBtn.className = 'py-3 px-4 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded-2xl shadow-md transition active:scale-95 flex items-center justify-center gap-2';
+                
+                // 인식 버튼 비활성화
+                detectToggleBtn.disabled = true;
+                detectToggleBtn.className = 'py-3 px-4 bg-gray-200 text-gray-400 font-medium rounded-2xl shadow-sm transition active:scale-95 flex items-center justify-center gap-2 cursor-not-allowed';
+                
+                resetResultUI();
             }
         }
 
-        function startRecognition() {
-            isRunning = true;
-            toggleBtn.className = 'w-full py-3 px-4 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold rounded-xl shadow-lg shadow-rose-600/30 transition-all flex items-center justify-center space-x-2';
-            toggleText.textContent = '인식 중지하기';
-            toggleBtn.querySelector('i').className = 'fa-solid fa-stop';
+        // 인식 시작 / 중지 토글
+        function toggleDetection() {
+            if (!isCameraOn) return;
 
-            // Capture and send every ~1 second
-            intervalId = setInterval(captureAndSendFrame, 1000);
+            if (!isDetecting) {
+                isDetecting = true;
+                detectToggleBtn.innerHTML = '⏸️ 인식 중지';
+                detectToggleBtn.className = 'py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-2xl shadow-md transition active:scale-95 flex items-center justify-center gap-2';
+                
+                // 약 1초(1000ms) 간격으로 예측 요청 실행
+                detectInterval = setInterval(sendFrameForPrediction, 1000);
+            } else {
+                stopDetection();
+            }
         }
 
-        function stopRecognition() {
-            isRunning = false;
-            if (intervalId) clearInterval(intervalId);
-            toggleBtn.className = 'w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center space-x-2';
-            toggleText.textContent = '인식 시작하기';
-            toggleBtn.querySelector('i').className = 'fa-solid fa-play';
-
-            gestureIcon.textContent = '🤔';
-            gestureName.textContent = '-';
-            gestureConf.textContent = '신뢰도: 0%';
+        function stopDetection() {
+            isDetecting = false;
+            if (detectInterval) clearInterval(detectInterval);
+            detectInterval = null;
+            if (isCameraOn) {
+                detectToggleBtn.innerHTML = '▶️ 인식 시작';
+                detectToggleBtn.className = 'py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-2xl shadow-md transition active:scale-95 flex items-center justify-center gap-2';
+            }
+            resetResultUI();
         }
 
-        async function captureAndSendFrame() {
-            if (!isRunning || isProcessing) return;
-            if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+        function resetResultUI() {
+            resultIcon.innerText = '⏳';
+            resultText.innerText = '대기 중';
+            resultConf.innerText = '0%';
+        }
 
+        // 현재 웹캠 프레임을 캡처하여 서버리스 API로 전송
+        async function sendFrameForPrediction() {
+            if (!isDetecting || isProcessing || !isCameraOn) return;
             isProcessing = true;
-            canvas.width = video.videoWidth || 640;
-            canvas.height = video.videoHeight || 480;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            // Get Base64 image data (JPEG)
-            const base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
             try {
-                const response = await fetch('/api/generate', {
+                // 캔버스에 현재 비디오 프레임 그리기
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // Base64 형식으로 변환 (헤더 제거)
+                const base64Data = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+
+                // 백엔드 API 호출 (/api/predict)
+                const response = await fetch('/api/predict', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: base64Image })
+                    body: JSON.stringify({ image: base64Data })
                 });
 
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
+                if (!response.ok) throw new Error('API 요청 실패');
 
                 const data = await response.json();
-                handlePredictionResult(data);
+                updateResultUI(data);
+
             } catch (err) {
-                console.error("API request failed:", err);
+                console.error('인식 오류:', err);
             } finally {
                 isProcessing = false;
             }
         }
 
-        function handlePredictionResult(data) {
-            // Expecting Roboflow inference response format or custom JSON
-            // e.g. predictions array with class and confidence
-            let predictions = data.predictions || data;
-            if (Array.isArray(predictions) && predictions.length > 0) {
-                // Sort by confidence descending
-                predictions.sort((a, b) => b.confidence - a.confidence);
-                const best = predictions[0];
-                const className = (best.class || '').toLowerCase();
-                const confidence = Math.round((best.confidence || 0) * 100);
+        // 예측 결과 화면 반영
+        function updateResultUI(data) {
+            // Roboflow 모델 응답 구조에 맞게 수정 가능 (classification 또는 object detection 결과 처리)
+            // 일반적인 Classification Workflow 응답 구조 가정: { predictions: { class: 'rock', confidence: 0.95 } } 또는 유사 구조
+            let className = '';
+            let confidence = 0;
 
-                if (gestureMap[className]) {
-                    gestureIcon.textContent = gestureMap[className].icon;
-                    gestureName.textContent = gestureMap[className].name;
-                    gestureConf.textContent = `신뢰도: ${confidence}%`;
+            if (data) {
+                // Workflow 응답 포맷에 따라 파싱 (예: data.predictions 또는 data.output 등)
+                // Roboflow Workflow 표준 응답 구조 대응
+                const prediction = data.predictions || data.output || data;
+                className = prediction.class || prediction.predicted_classes || (Array.isArray(prediction) ? prediction[0]?.class : '');
+                confidence = prediction.confidence || (Array.isArray(prediction) ? prediction[0]?.confidence : 0);
+            }
 
-                    // Update count
-                    counts[className]++;
-                    document.getElementById(`count-${className}`).textContent = counts[className];
-                }
-            } else if (data.class) {
-                const className = data.class.toLowerCase();
-                const confidence = Math.round((data.confidence || 0) * 100);
-                if (gestureMap[className]) {
-                    gestureIcon.textContent = gestureMap[className].icon;
-                    gestureName.textContent = gestureMap[className].name;
-                    gestureConf.textContent = `신뢰도: ${confidence}%`;
-
-                    counts[className]++;
-                    document.getElementById(`count-${className}`).textContent = counts[className];
-                }
+            if (className && classMap[className]) {
+                const info = classMap[className];
+                resultIcon.innerText = info.icon;
+                resultText.innerText = info.text;
+                resultConf.innerText = `${Math.round(confidence * 100)}%`;
+            } else {
+                resultIcon.innerText = '❓';
+                resultText.innerText = '인식 불가';
+                resultConf.innerText = '0%';
             }
         }
-
-        function resetStats() {
-            counts.rock = 0;
-            counts.paper = 0;
-            counts.scissors = 0;
-            document.getElementById('count-rock').textContent = '0';
-            document.getElementById('count-paper').textContent = '0';
-            document.getElementById('count-scissors').textContent = '0';
-        }
-
-        // Run camera initialization on load
-        window.onload = initCamera;
     </script>
 </body>
 </html>
