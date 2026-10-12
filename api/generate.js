@@ -1,47 +1,47 @@
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
-        res.setHeader('Allow', ['POST']);
-        return res.status(405.json({ error: `Method ${req.method} Not Allowed` }));
+        return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
     try {
         const { image } = req.body;
-
         if (!image) {
-            return res.status(400).json({ error: 'Image data is required in base64 format.' });
+            return res.status(400).json({ error: 'Image data is required' });
         }
 
         const apiKey = process.env.ROBOFLOW_API_KEY;
         const endpoint = process.env.ROBOFLOW_ENDPOINT;
 
         if (!apiKey || !endpoint) {
-            return res.status(500).json({ 
-                error: 'Server environment variables ROBOFLOW_API_KEY or ROBOFLOW_ENDPOINT are not configured.' 
-            });
+            return res.status(500).json({ error: 'Server environment variables not configured' });
         }
 
-        // Construct Roboflow Infer API URL with API key parameter
-        const apiURL = `${endpoint}?api_key=${apiKey}`;
-
-        // Forward image to Roboflow API
-        const response = await fetch(apiURL, {
+        // Roboflow Workflow API 호출 (cURL/HTTP 예제 기준)
+        const apiResponse = await fetch(`${endpoint}?api_key=${apiKey}`, {
             method: 'POST',
-            body: image, // Roboflow inference accepts raw base64 string or multipart/form-data depending on version
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                inputs: {
+                    image: {
+                        type: "base64",
+                        value: image
+                    }
+                }
+            })
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            return res.status(response.status).json({ error: `Roboflow API error: ${errorText}` });
+        if (!apiResponse.ok) {
+            const errorText = await apiResponse.text();
+            return res.status(apiResponse.status).json({ error: 'Roboflow API error', details: errorText });
         }
 
-        const result = await response.json();
+        const result = await apiResponse.json();
         return res.status(200).json(result);
 
-    } catch (err) {
-        console.error('Error processing gesture recognition:', err);
-        return res.status(500).json({ error: 'Internal Server Error', details: err.message });
+    } catch (error) {
+        console.error('API Server Error:', error);
+        return res.status(500).json({ error: 'Internal Server Error', message: error.message });
     }
 }
